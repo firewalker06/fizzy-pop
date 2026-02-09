@@ -1,0 +1,6 @@
+.git
+.ruby-lsp
+bin
+build.log
+fizzy-pop
+*.md

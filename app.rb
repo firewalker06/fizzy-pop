@@ -1,3 +1,5 @@
+$stdout.sync = true
+
 require "httpx"
 require "json"
 require "optparse"
