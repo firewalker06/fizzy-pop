@@ -1,0 +1,16 @@
+GEM
+  remote: https://rubygems.org/
+  specs:
+    http-2 (1.1.2)
+    httpx (1.7.2)
+      http-2 (>= 1.0.0)
+
+PLATFORMS
+  arm64-darwin-24
+  ruby
+
+DEPENDENCIES
+  httpx (~> 1.4)
+
+BUNDLED WITH
+   2.7.2
