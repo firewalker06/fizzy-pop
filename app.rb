@@ -28,6 +28,18 @@ WEBHOOK_TOKEN = options[:webhook_token]
 POLLING_DURATION = options[:polling]
 DRY_RUN = options[:dry_run]
 
+def handle_response(response, label)
+  if response.is_a?(HTTPX::ErrorResponse)
+    puts "#{label} error: #{response.error.message}"
+    nil
+  elsif (200..299).cover?(response.status)
+    response
+  else
+    puts "#{label} failed (HTTP #{response.status}): #{response.body}"
+    nil
+  end
+end
+
 fizzy_http_client = HTTPX.with(
   headers: {
     "authorization" => "Bearer #{FIZZY_TOKEN}",
@@ -45,11 +57,8 @@ webhook_http_client = HTTPX.with(
 
 # First, get the account slug from identity
 breadcrumbs << "get_identity"
-response = fizzy_http_client.get("#{BASE_URL}/my/identity")
-
-unless response.status == 200
-  abort "Failed to fetch identity (HTTP #{response.status}): #{response.body}"
-end
+response = handle_response(fizzy_http_client.get("#{BASE_URL}/my/identity"), "Identity")
+abort "Failed to fetch identity" unless response
 
 identity = JSON.parse(response.body.to_s)
 accounts = identity["accounts"]
@@ -67,21 +76,19 @@ begin
       user = account["user"]
 
       breadcrumbs << "get_notifications"
-      response = fizzy_http_client.get("#{BASE_URL}#{slug}/notifications")
-
-      unless response.status == 200
-        puts "Failed to fetch notifications (HTTP #{response.status}): #{response.body}"
-        next
-      end
+      response = handle_response(fizzy_http_client.get("#{BASE_URL}#{slug}/notifications"), "Notifications")
+      next unless response
 
       notifications = JSON.parse(response.body.to_s)
       unread = notifications.select { |n| !n["read"] }.first
 
       if unread.nil?
         next
+      elsif DRY_RUN
+        puts "Will mark notification #{unread["id"]} as read."
       else
         breadcrumbs << "read_notification"
-        fizzy_http_client.post("#{BASE_URL}#{slug}/notifications/#{unread["id"]}/reading")
+        handle_response(fizzy_http_client.post("#{BASE_URL}#{slug}/notifications/#{unread["id"]}/reading"), "Mark read")
         puts "Marked notification #{unread["id"]} as read."
       end
 
@@ -112,18 +119,13 @@ begin
           abort "Missing required --webhook-url and --webhook-token"
         end
 
-        webhook_response = webhook_http_client.post(webhook_url, body: payload)
-
-        if webhook_response.is_a?(HTTPX::ErrorResponse)
-          puts "\nWebhook error: #{webhook_response.error.message}"
-        elsif webhook_response.status == 200
-          puts "\nWebhook delivered successfully."
-        else
-          puts "\nWebhook failed (HTTP #{webhook_response.status}): #{webhook_response.body}"
+        if handle_response(webhook_http_client.post(webhook_url, body: payload), "Webhook")
+          puts "Webhook delivered successfully."
         end
       end
     end
 
+    breadcrumbs.replace(["begin"])
     sleep POLLING_DURATION
   end
 rescue Interrupt, SignalException
