@@ -5,6 +5,7 @@ require "json"
 require "optparse"
 
 options = { polling: 10 }
+breadcrumbs = ["begin"]
 
 OptionParser.new do |opts|
   opts.banner = "Usage: ruby app.rb --url URL --token TOKEN [options]"
@@ -43,6 +44,7 @@ webhook_http_client = HTTPX.with(
 ) if WEBHOOK_TOKEN
 
 # First, get the account slug from identity
+breadcrumbs << "get_identity"
 response = fizzy_http_client.get("#{BASE_URL}/my/identity")
 
 unless response.status == 200
@@ -64,6 +66,7 @@ begin
       slug = account["slug"]
       user = account["user"]
 
+      breadcrumbs << "get_notifications"
       response = fizzy_http_client.get("#{BASE_URL}#{slug}/notifications")
 
       unless response.status == 200
@@ -77,6 +80,7 @@ begin
       if unread.nil?
         next
       else
+        breadcrumbs << "read_notification"
         fizzy_http_client.post("#{BASE_URL}#{slug}/notifications/#{unread["id"]}/reading")
         puts "Marked notification #{unread["id"]} as read."
       end
@@ -96,9 +100,10 @@ begin
 
       puts message
 
+      breadcrumbs << "send_webhook"
       # Send to OpenClaw webhook
-      webhook_url = "#{WEBHOOK_BASE_URL}/hooks/wake"
-      payload = JSON.generate(text: message, mode: "now")
+      webhook_url = "#{WEBHOOK_BASE_URL}/hooks/agent"
+      payload = JSON.generate(message: message, mode: "now", deliver: false)
       if DRY_RUN
         puts "\n--dry-run: would POST to #{webhook_url}"
         puts "Body: #{payload}"
@@ -109,7 +114,9 @@ begin
 
         webhook_response = webhook_http_client.post(webhook_url, body: payload)
 
-        if webhook_response.status == 200
+        if webhook_response.is_a?(HTTPX::ErrorResponse)
+          puts "\nWebhook error: #{webhook_response.error.message}"
+        elsif webhook_response.status == 200
           puts "\nWebhook delivered successfully."
         else
           puts "\nWebhook failed (HTTP #{webhook_response.status}): #{webhook_response.body}"
@@ -120,7 +127,9 @@ begin
     sleep POLLING_DURATION
   end
 rescue Interrupt, SignalException
+  puts "\nBreadcrumbs: #{breadcrumbs.join(" -> ")}"
   puts "\nShutting down..."
 rescue StandardError => e
+  puts "\nBreadcrumbs: #{breadcrumbs.join(" -> ")}"
   puts "\nAn error occurred: #{e.message}"
 end

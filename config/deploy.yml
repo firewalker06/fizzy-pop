@@ -9,8 +9,9 @@ servers:
   web:
     hosts: <%= ENV.fetch("HOSTS").split(",").map(&:strip) %>
     cmd: --url <%= ENV.fetch("URL") %> --token <%= ENV.fetch("TOKEN") %> --webhook-url <%= ENV.fetch("WEBHOOK_URL") %> --webhook-token <%= ENV.fetch("WEBHOOK_TOKEN") %>
+    proxy: false
     options:
-      health-cmd: "true"
+      add-host: "host.docker.internal:host-gateway"
   # job:
   #   hosts:
   #     - 192.168.0.1
@@ -20,7 +21,7 @@ servers:
 # Remove this section when using multiple web servers and ensure you terminate SSL at your load balancer.
 #
 # Note: If using Cloudflare, set encryption mode in SSL/TLS setting to "Full" to enable CF-to-app encryption.
-proxy: false
+# proxy:
 #   ssl: true
 #   host: app.example.com
   # Proxy connects to your container on port 80 by default.
