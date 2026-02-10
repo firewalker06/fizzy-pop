@@ -32,7 +32,7 @@ def handle_response(response, label)
   if response.is_a?(HTTPX::ErrorResponse)
     puts "#{label} error: #{response.error.message}"
     nil
-  elsif (200..299).cover?(response.status)
+  elsif (200..299).cover?(response.status.to_i)
     response
   else
     puts "#{label} failed (HTTP #{response.status}): #{response.body}"
