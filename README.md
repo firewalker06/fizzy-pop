@@ -1,6 +1,8 @@
 # Fizzy Pop
 
-A Ruby polling daemon that watches [Fizzy](https://app.fizzy.do) for unread notifications and forwards them to an [OpenClaw](https://docs.openclaw.ai) webhook.
+<div align="center"><img src="fizzypop_logo.png" alt="Fizzy Pop Logo"></div>
+
+A polling daemon that watches [Fizzy](https://app.fizzy.do) for unread notifications and forwards them to an [OpenClaw](https://docs.openclaw.ai) webhook.
 
 [OpenClaw's heartbeat is costly](https://docs.openclaw.ai/gateway/heartbeat#cost-awareness) for simple notification checking, which is why this separate polling service exists. We can also added more instructions and references in the webhook payload for better result.
 
