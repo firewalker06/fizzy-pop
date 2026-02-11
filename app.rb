@@ -146,7 +146,31 @@ begin
                 From: #{unread["creator"]["name"]} (#{unread["creator"]["id"]})
                 Title: #{unread["title"]}
                 Message: #{unread["body"]}
-                Card: #{unread["card"]["id"]}
+                Card: #{unread["card"]["url"].split("/").last}
+
+                # Commands Reference
+                fizzy reaction list --card NUMBER
+                fizzy reaction create --card NUMBER --content "emoji"
+                fizzy reaction delete REACTION_ID --card NUMBER
+                fizzy reaction list --card NUMBER --comment COMMENT_ID
+                fizzy reaction create --card NUMBER --comment COMMENT_ID --content "emoji"
+                fizzy reaction delete REACTION_ID --card NUMBER --comment COMMENT_ID
+                fizzy comment list --card NUMBER [--page N] [--all]
+                fizzy comment show COMMENT_ID --card NUMBER
+                fizzy comment create --card NUMBER --body "HTML" [--body_file PATH] [--created-at TIMESTAMP]
+                fizzy comment update COMMENT_ID --card NUMBER [--body "HTML"] [--body_file PATH]
+                fizzy comment delete COMMENT_ID --card NUMBER
+                fizzy card column CARD_NUMBER --column ID     # Move to column (use column ID or: maybe, not-yet, done)
+                fizzy card move CARD_NUMBER --to BOARD_ID     # Move card to a different board
+                fizzy card assign CARD_NUMBER --user ID       # Toggle user assignment
+                fizzy card tag CARD_NUMBER --tag "name"       # Toggle tag (creates tag if needed)
+                fizzy card watch CARD_NUMBER                  # Subscribe to notifications
+                fizzy card unwatch CARD_NUMBER                # Unsubscribe
+                fizzy card pin CARD_NUMBER                    # Pin card for quick access
+                fizzy card unpin CARD_NUMBER                  # Unpin card
+                fizzy card golden CARD_NUMBER                 # Mark as golden/starred
+                fizzy card ungolden CARD_NUMBER               # Remove golden status
+                fizzy card image-remove CARD_NUMBER           # Remove header image
               PROMPT
 
       puts message
