@@ -129,14 +129,24 @@ begin
       next if unread["creator"].nil? # Only process comment and mention notifications
 
       message = <<~PROMPT
-                The following is notification from Fizzy:
+                You have a new notification in Fizzy that requires your attention.
+
+                # Fizzy command check
+                DO NOTHING if fizzy is not available in shell.
+
+                # Task
+                - Read the Card from the notification.
+                - Read the latest comment on the card.
+                - Check whether the card already have 👀 reaction (boost) from you.
+                  - Send 👀 boost to the card URL provided ONLY WHEN there is no boost from you
+                - DO THE INSTRUCTION in the latest comment if any instruction is provided.
+                - DO NOTHING if there is no action.
+
+                # Notification details
                 From: #{unread["creator"]["name"]} (#{unread["creator"]["id"]})
                 Title: #{unread["title"]}
                 Message: #{unread["body"]}
-
-                Send 👀 reaction (boost) to #{unread["card"]["url"]}, which means you have read this.
-                If the message contains instruction for you, follow up by replying there and then do the action required.
-                DO NOTHING if no action is needed.
+                Card: #{unread["card"]["id"]}
               PROMPT
 
       puts message

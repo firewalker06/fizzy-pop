@@ -8,7 +8,7 @@ image: fizzy-pop
 servers:
   web:
     hosts: <%= ENV.fetch("HOSTS").split(",").map(&:strip) %>
-    cmd: --url <%= ENV.fetch("URL") %> --token <%= ENV.fetch("TOKEN") %> --webhook-url <%= ENV.fetch("WEBHOOK_URL") %> --webhook-token <%= ENV.fetch("WEBHOOK_TOKEN") %>
+    cmd: --verbose --url <%= ENV.fetch("URL") %> --token <%= ENV.fetch("TOKEN") %> --webhook-url <%= ENV.fetch("WEBHOOK_URL") %> --webhook-token <%= ENV.fetch("WEBHOOK_TOKEN") %>
     proxy: false
     options:
       add-host: "host.docker.internal:host-gateway"

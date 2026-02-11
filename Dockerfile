@@ -12,4 +12,4 @@ WORKDIR /app
 COPY --from=build /usr/local/bundle /usr/local/bundle
 COPY app.rb ./
 
-ENTRYPOINT ["ruby", "app.rb", "--verbose"]
+ENTRYPOINT ["ruby", "app.rb"]
