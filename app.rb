@@ -16,6 +16,7 @@ OptionParser.new do |opts|
   opts.on("--webhook-token TOKEN", "OpenClaw webhook token") { |v| options[:webhook_token] = v }
   opts.on("--polling SECONDS", Integer, "Polling interval in seconds (default: 10)") { |v| options[:polling] = v }
   opts.on("--dry-run", "Print webhook requests instead of sending them") { options[:dry_run] = true }
+  opts.on("--verbose", "Print full request/response headers and body") { options[:verbose] = true }
 end.parse!
 
 abort "Missing required --url" unless options[:url]
@@ -27,36 +28,66 @@ WEBHOOK_BASE_URL = options[:webhook_url]
 WEBHOOK_TOKEN = options[:webhook_token]
 POLLING_DURATION = options[:polling]
 DRY_RUN = options[:dry_run]
+VERBOSE = options[:verbose]
+
+def debug_request(method, url, headers: {}, body: nil)
+  puts "\e[36m--> #{method.upcase} #{url}\e[0m"
+  if VERBOSE
+    headers.each { |k, v| puts "\e[36m    #{k}: #{k.downcase == "authorization" ? "[REDACTED]" : v}\e[0m" }
+    if body
+      puts "\e[36m    Body:\e[0m"
+      puts "\e[31m      #{body}\e[0m"
+    end
+  end
+end
+
+def debug_response(response, label)
+  if response.is_a?(HTTPX::ErrorResponse)
+    puts "\e[31m<-- #{label} error: #{response.error.message}\e[0m"
+    puts "\e[31m    #{response.body.inspect}\e[0m" if response.body
+  else
+    status = response.status.to_i
+    color = (200..299).cover?(status) ? "\e[32m" : "\e[31m"
+    puts "#{color}<-- #{label} #{status} (#{response.body.to_s.bytesize} bytes)\e[0m"
+    if VERBOSE
+      response.headers.each { |k, v| puts "#{color}    #{k}: #{v}\e[0m" }
+      body = response.body.to_s
+      unless body.empty?
+        puts "#{color}    Body:\e[0m"
+        puts "#{color}#{JSON.pretty_generate(JSON.parse(body.to_s)).gsub(/^/, " " * 6)}\e[0m"
+      end
+    end
+  end
+end
 
 def handle_response(response, label)
+  debug_response(response, label)
   if response.is_a?(HTTPX::ErrorResponse)
-    puts "#{label} error: #{response.error.message}"
     nil
   elsif (200..299).cover?(response.status.to_i)
     response
   else
-    puts "#{label} failed (HTTP #{response.status}): #{response.body}"
     nil
   end
 end
 
-fizzy_http_client = HTTPX.with(
-  headers: {
-    "authorization" => "Bearer #{FIZZY_TOKEN}",
-    "accept" => "application/json",
-    "content-type" => "application/json"
-  }
-)
+FIZZY_HEADERS = {
+  "authorization" => "Bearer #{FIZZY_TOKEN}",
+  "accept" => "application/json",
+  "content-type" => "application/json"
+}
 
-webhook_http_client = HTTPX.with(
-  headers: {
-    "authorization" => "Bearer #{WEBHOOK_TOKEN}",
-    "content-type" => "application/json"
-  }
-) if WEBHOOK_TOKEN
+WEBHOOK_HEADERS = {
+  "authorization" => "Bearer #{WEBHOOK_TOKEN}",
+  "content-type" => "application/json"
+}
+
+fizzy_http_client = HTTPX.with(headers: FIZZY_HEADERS)
+webhook_http_client = HTTPX.with(headers: WEBHOOK_HEADERS) if WEBHOOK_TOKEN
 
 # First, get the account slug from identity
 breadcrumbs << "get_identity"
+debug_request("GET", "#{BASE_URL}/my/identity", headers: FIZZY_HEADERS)
 response = handle_response(fizzy_http_client.get("#{BASE_URL}/my/identity"), "Identity")
 abort "Failed to fetch identity" unless response
 
@@ -76,6 +107,7 @@ begin
       user = account["user"]
 
       breadcrumbs << "get_notifications"
+      debug_request("GET", "#{BASE_URL}#{slug}/notifications", headers: FIZZY_HEADERS)
       response = handle_response(fizzy_http_client.get("#{BASE_URL}#{slug}/notifications"), "Notifications")
       next unless response
 
@@ -88,7 +120,9 @@ begin
         puts "Will mark notification #{unread["id"]} as read."
       else
         breadcrumbs << "read_notification"
-        handle_response(fizzy_http_client.post("#{BASE_URL}#{slug}/notifications/#{unread["id"]}/reading"), "Mark read")
+        mark_read_url = "#{BASE_URL}#{slug}/notifications/#{unread["id"]}/reading"
+        debug_request("POST", mark_read_url, headers: FIZZY_HEADERS)
+        handle_response(fizzy_http_client.post(mark_read_url), "Mark read")
         puts "Marked notification #{unread["id"]} as read."
       end
 
@@ -119,6 +153,7 @@ begin
           abort "Missing required --webhook-url and --webhook-token"
         end
 
+        debug_request("POST", webhook_url, headers: WEBHOOK_HEADERS, body: payload)
         if handle_response(webhook_http_client.post(webhook_url, body: payload), "Webhook")
           puts "Webhook delivered successfully."
         end
