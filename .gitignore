@@ -3,3 +3,6 @@
 
 # Config file contains tokens
 config.yml
+
+# Config file for Kamal
+config/deploy.yml
