@@ -10,6 +10,8 @@ A polling daemon that watches [Fizzy](https://app.fizzy.do) for unread notificat
 
 - [Setup](#setup)
 - [Usage](#usage)
+  - [Single Agent Mode](#single-agent-mode)
+  - [Multi-Agent Mode](#multi-agent-mode)
   - [Options](#options)
   - [Examples](#examples)
 - [Docker](#docker)
@@ -28,32 +30,79 @@ bundle install
 ## Usage
 
 ```bash
-ruby app.rb --url URL --token TOKEN [options]
+ruby app.rb [--config FILE | --token TOKEN] [options]
+```
+
+### Single Agent Mode
+
+For a single agent, use the `--token` flag:
+
+```bash
+ruby app.rb --url https://app.fizzy.do --token abc123 --webhook-url http://localhost:18789 --webhook-token secret
+```
+
+### Multi-Agent Mode
+
+For multiple agents, use a YAML config file:
+
+```bash
+ruby app.rb --config config.yml
+```
+
+Create a `config.yml` (see `config.example.yml`):
+
+```yaml
+url: https://app.fizzy.do
+webhook_url: http://localhost:18789
+webhook_token: your-webhook-token
+polling: 10
+
+agents:
+  - name: optimus
+    token: optimus-fizzy-token
+  - name: wheeljack
+    token: wheeljack-fizzy-token
+  - name: prowl
+    token: prowl-fizzy-token
+```
+
+Each agent's notifications are polled independently. The webhook payload includes the agent name so OpenClaw can route to the correct session:
+
+```json
+{
+  "agent": "optimus",
+  "message": "You have a new notification...",
+  "mode": "now",
+  "deliver": false
+}
 ```
 
 ### Options
 
 | Flag | Required | Description | Default |
 |------|----------|-------------|---------|
-| `--url URL` | Yes | Fizzy base URL (e.g. `https://app.fizzy.do`) | — |
-| `--token TOKEN` | Yes | Fizzy personal access token | — |
+| `--url URL` | Yes* | Fizzy base URL (e.g. `https://app.fizzy.do`) | — |
+| `--token TOKEN` | Yes* | Fizzy personal access token (single agent mode) | — |
+| `--config FILE` | Yes* | YAML config file for multi-agent mode | — |
 | `--webhook-url URL` | No | OpenClaw webhook base URL | — |
 | `--webhook-token TOKEN` | No | OpenClaw webhook bearer token | — |
 | `--polling SECONDS` | No | Polling interval in seconds | `10` |
 | `--dry-run` | No | Print webhook payload without sending | — |
 | `--verbose` | No | Print full request/response headers and body (redacts Authorization) | — |
 
+*Either `--token` or `--config` is required. When using `--config`, the `url` can be specified in the config file.
+
 Both `--webhook-url` and `--webhook-token` are required unless `--dry-run` is used.
 
 ### Examples
 
-Dry run (no webhook):
+Dry run (single agent, no webhook):
 
 ```bash
 ruby app.rb --url https://app.fizzy.do --token abc123 --dry-run
 ```
 
-With webhook forwarding:
+Single agent with webhook forwarding:
 
 ```bash
 ruby app.rb \
@@ -63,10 +112,22 @@ ruby app.rb \
   --webhook-token my-secret
 ```
 
+Multi-agent with config file:
+
+```bash
+ruby app.rb --config config.yml
+```
+
+Multi-agent dry run:
+
+```bash
+ruby app.rb --config config.yml --dry-run --verbose
+```
+
 Run as background daemon:
 
 ```bash
-nohup ruby app.rb --url https://app.fizzy.do --token abc123 --dry-run > fizzy-pop.log 2>&1 &
+nohup ruby app.rb --config config.yml > fizzy-pop.log 2>&1 &
 ```
 
 ## Docker
@@ -79,7 +140,7 @@ docker build -t fizzy-pop .
 
 ### Run
 
-Pass the CLI flags directly as arguments to the container:
+Single agent mode:
 
 ```bash
 docker run --rm fizzy-pop \
@@ -89,16 +150,23 @@ docker run --rm fizzy-pop \
   --webhook-token my-secret
 ```
 
+Multi-agent mode (mount config file):
+
+```bash
+docker run --rm \
+  -v $(pwd)/config.yml:/app/config.yml:ro \
+  fizzy-pop \
+  --config /app/config.yml
+```
+
 If the OpenClaw gateway is running on the host machine, add `--add-host` so the container can reach it:
 
 ```bash
 docker run --rm \
   --add-host host.docker.internal:host-gateway \
+  -v $(pwd)/config.yml:/app/config.yml:ro \
   fizzy-pop \
-  --url https://app.fizzy.do \
-  --token abc123 \
-  --webhook-url http://host.docker.internal:18789 \
-  --webhook-token my-secret \
+  --config /app/config.yml \
   --verbose
 ```
 
@@ -117,6 +185,8 @@ TOKEN=your-fizzy-token
 WEBHOOK_URL=http://host.docker.internal:18789
 WEBHOOK_TOKEN=your-webhook-token
 ```
+
+For multi-agent mode, mount your `config.yml` instead of using `TOKEN`.
 
 The `bin/kamal` binstub automatically loads `.env` before running Kamal. Environment variables already set in your shell take precedence.
 
@@ -166,12 +236,26 @@ The `hooks.token` value is what you pass as `--webhook-token`. The `--webhook-ur
 
 Fizzy Pop posts to `POST /hooks/agent` with `Authorization: Bearer <token>`.
 
-See the [OpenClaw webhook docs](https://docs.openclaw.ai/automation/webhook) for more details.
+### Agent Routing (Multi-Agent Mode)
+
+When using multi-agent mode, the webhook payload includes an `agent` field:
+
+```json
+{
+  "agent": "optimus",
+  "message": "...",
+  "mode": "now",
+  "deliver": false
+}
+```
+
+Configure OpenClaw to route based on the agent name. See the [OpenClaw webhook docs](https://docs.openclaw.ai/automation/webhook) for more details.
 
 ## How It Works
 
-1. Authenticates with Fizzy using a personal access token
-2. Polls for unread notifications every N seconds
+1. Authenticates with Fizzy using personal access token(s)
+2. Polls for unread notifications every N seconds (for each agent in multi-agent mode)
 3. For each unread notification with a creator (comments/mentions):
    - Marks it as read in Fizzy
    - Forwards the notification to the OpenClaw webhook (`POST /hooks/agent`)
+   - Includes agent identifier in payload (multi-agent mode)

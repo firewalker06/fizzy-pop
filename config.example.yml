@@ -1,0 +1,36 @@
+# fizzy-pop multi-agent configuration
+#
+# Copy this file to config.yml and fill in your values.
+# Run with: ruby app.rb --config config.yml
+
+# Fizzy base URL (required)
+url: https://app.fizzy.do
+
+# OpenClaw webhook settings (required unless --dry-run)
+webhook_url: http://localhost:18789
+webhook_token: your-webhook-token
+
+# Polling interval in seconds (optional, default: 10)
+polling: 10
+
+# Agent configurations
+# Each agent needs a name and Fizzy personal access token
+agents:
+  - name: optimus
+    token: your-optimus-fizzy-token
+
+  - name: wheeljack
+    token: your-wheeljack-fizzy-token
+
+  - name: prowl
+    token: your-prowl-fizzy-token
+
+# The webhook payload will include the agent name:
+# {
+#   "agent": "optimus",
+#   "message": "...",
+#   "mode": "now",
+#   "deliver": false
+# }
+#
+# OpenClaw can use this to route to the correct agent session.
