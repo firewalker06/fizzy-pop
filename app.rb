@@ -224,9 +224,10 @@ begin
 
         breadcrumbs << "send_webhook:#{agent[:name]}"
         # Send to OpenClaw webhook with agent identifier
+        # Docs: https://docs.openclaw.ai/automation/webhook#post-/hooks/agent
         webhook_url = "#{WEBHOOK_BASE_URL}/hooks/agent"
         payload = JSON.generate(
-          agent: agent[:name],
+          agentId: agent[:name],
           message: message,
           mode: "now",
           deliver: false
