@@ -226,7 +226,7 @@ begin
         # Send to OpenClaw webhook with agent identifier
         webhook_url = "#{WEBHOOK_BASE_URL}/hooks/agent"
         payload = JSON.generate(
-          agent: agent[:name],
+          agentId: agent[:name],
           message: message,
           mode: "now",
           deliver: false
