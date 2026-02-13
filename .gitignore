@@ -1,2 +1,5 @@
 # Do not track environment files
 .env
+
+# Config file contains tokens
+config.yml
