@@ -14,7 +14,7 @@ webhook_client = if config.webhook_url && config.webhook_token
 end
 
 agents = config.agents.map do |agent_config|
-  FizzyPop::Agent.new(name: agent_config[:name], token: agent_config[:token], base_url: config.url)
+  FizzyPop::Agent.new(name: agent_config[:name], token: agent_config[:token], base_url: config.url, interval_agent_poll: config.interval_agent_poll)
 end
 
 agents.each(&:fetch_identity!)
@@ -24,14 +24,37 @@ if active_agents.empty?
   abort "No agents have valid accounts. Check your tokens."
 end
 
-puts "Polling #{active_agents.length} agent(s) for notifications every #{config.polling} seconds... (Ctrl+C to stop)"
+puts "Polling #{active_agents.length} agent(s) every #{config.interval_polling}s, webhook delivery every #{config.interval_webhook}s... (Ctrl+C to stop)"
+
+Thread.abort_on_exception = true
+queue = Queue.new
 
 begin
-  loop do
-    active_agents.each { |agent| agent.poll(webhook_client) }
-    FizzyPop::Debug.reset_breadcrumbs
-    sleep config.polling
+  poll_thread = Thread.new do
+    loop do
+      active_agents.each { |agent| agent.poll_notifications(queue) }
+      FizzyPop::Debug.reset_breadcrumbs
+      sleep config.interval_polling
+    end
   end
+
+  webhook_thread = Thread.new do
+    loop do
+      item = queue.pop
+      FizzyPop::Debug.breadcrumbs << "send_webhook:#{item[:agent_name]}"
+
+      if webhook_client
+        webhook_client.deliver(item[:agent_name], item[:message])
+      elsif !FizzyPop::Debug.dry_run
+        abort "Missing required --webhook-url and --webhook-token"
+      end
+
+      sleep config.interval_webhook
+    end
+  end
+
+  poll_thread.join
+  webhook_thread.join
 rescue Interrupt, SignalException
   puts "\nBreadcrumbs: #{FizzyPop::Debug.breadcrumbs.join(" -> ")}"
   puts "\nShutting down..."

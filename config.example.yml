@@ -10,8 +10,11 @@ url: https://app.fizzy.do
 webhook_url: http://localhost:18789
 webhook_token: your-webhook-token
 
-# Polling interval in seconds (optional, default: 10)
-polling: 10
+# Interval settings in seconds (optional)
+interval:
+  polling: 10      # how often to check for notifications (default: 10)
+  webhook: 3       # delay between webhook deliveries (default: 5)
+  agent_poll: 0.5  # delay between each agent's poll (default: 0.5)
 
 # Agent configurations
 # Each agent needs a name and Fizzy personal access token

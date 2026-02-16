@@ -2,9 +2,10 @@ module FizzyPop
   class Agent
     attr_reader :name, :accounts
 
-    def initialize(name:, token:, base_url:)
+    def initialize(name:, token:, base_url:, interval_agent_poll: 0.5)
       @name = name
       @client = FizzyClient.new(base_url, token)
+      @interval_agent_poll = interval_agent_poll
       @accounts = nil
     end
 
@@ -28,7 +29,7 @@ module FizzyPop
       @accounts && !@accounts.empty?
     end
 
-    def poll(webhook_client)
+    def poll_notifications(queue)
       @accounts.each do |account|
         slug = account["slug"]
 
@@ -97,14 +98,10 @@ module FizzyPop
 
         puts "\e[33m[#{@name}]\e[0m #{message}"
 
-        Debug.breadcrumbs << "send_webhook:#{@name}"
-
-        if webhook_client
-          webhook_client.deliver(@name, message)
-        elsif !Debug.dry_run
-          abort "Missing required --webhook-url and --webhook-token"
-        end
+        queue << { agent_name: @name, message: message }
       end
+
+      sleep @interval_agent_poll
     end
   end
 end
