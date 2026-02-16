@@ -1,0 +1,41 @@
+#!/usr/bin/env ruby
+
+$stdout.sync = true
+
+require_relative "../lib/fizzy_pop"
+
+config = FizzyPop::Config.new(ARGV)
+
+FizzyPop::Debug.verbose = config.verbose
+FizzyPop::Debug.dry_run = config.dry_run
+
+webhook_client = if config.webhook_url && config.webhook_token
+  FizzyPop::WebhookClient.new(config.webhook_url, config.webhook_token)
+end
+
+agents = config.agents.map do |agent_config|
+  FizzyPop::Agent.new(name: agent_config[:name], token: agent_config[:token], base_url: config.url)
+end
+
+agents.each(&:fetch_identity!)
+active_agents = agents.select(&:active?)
+
+if active_agents.empty?
+  abort "No agents have valid accounts. Check your tokens."
+end
+
+puts "Polling #{active_agents.length} agent(s) for notifications every #{config.polling} seconds... (Ctrl+C to stop)"
+
+begin
+  loop do
+    active_agents.each { |agent| agent.poll(webhook_client) }
+    FizzyPop::Debug.reset_breadcrumbs
+    sleep config.polling
+  end
+rescue Interrupt, SignalException
+  puts "\nBreadcrumbs: #{FizzyPop::Debug.breadcrumbs.join(" -> ")}"
+  puts "\nShutting down..."
+rescue StandardError => e
+  puts "\nBreadcrumbs: #{FizzyPop::Debug.breadcrumbs.join(" -> ")}"
+  puts "\nAn error occurred: #{e.message}"
+end

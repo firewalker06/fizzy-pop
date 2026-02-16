@@ -10,6 +10,7 @@ FROM ruby:3.4-alpine
 WORKDIR /app
 
 COPY --from=build /usr/local/bundle /usr/local/bundle
-COPY app.rb ./
+COPY bin/ ./bin/
+COPY lib/ ./lib/
 
-ENTRYPOINT ["ruby", "app.rb"]
+ENTRYPOINT ["ruby", "bin/fizzy-pop"]

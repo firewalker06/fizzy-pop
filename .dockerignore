@@ -1,6 +1,9 @@
+# Ignore version control and editor files
 .git
 .ruby-lsp
-bin
+# Ignore deployment and build files
+bin/kamal
 build.log
-fizzy-pop
+# Ignore logos and documentation
+fizzypop_logo.png
 *.md

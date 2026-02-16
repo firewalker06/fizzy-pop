@@ -1,0 +1,10 @@
+require "httpx"
+require "json"
+require "optparse"
+require "yaml"
+
+require_relative "fizzy_pop/debug"
+require_relative "fizzy_pop/config"
+require_relative "fizzy_pop/fizzy_client"
+require_relative "fizzy_pop/webhook_client"
+require_relative "fizzy_pop/agent"

@@ -13,16 +13,16 @@ Fizzy Pop is a Ruby polling daemon that watches [Fizzy](https://app.fizzy.do) fo
 bundle install
 
 # Run with config file (multi-agent mode)
-ruby app.rb --config config.yml
+ruby bin/fizzy-pop --config config.yml
 
 # Run single agent
-ruby app.rb --url https://app.fizzy.do --token TOKEN --webhook-url URL --webhook-token TOKEN
+ruby bin/fizzy-pop --url https://app.fizzy.do --token TOKEN --webhook-url URL --webhook-token TOKEN
 
 # Dry run (validates payloads without sending webhooks)
-ruby app.rb --config config.yml --dry-run
+ruby bin/fizzy-pop --config config.yml --dry-run
 
 # Verbose logging (shows HTTP requests/responses with redacted auth)
-ruby app.rb --config config.yml --verbose
+ruby bin/fizzy-pop --config config.yml --verbose
 
 # Docker build and run
 docker build -t fizzy-pop .
@@ -38,13 +38,36 @@ There are no tests or linting configured.
 
 ## Architecture
 
-The entire application is a single file: **app.rb** (~260 lines). There is no framework — it uses Ruby's standard library plus the `httpx` HTTP client.
+The application is organized under `lib/fizzy_pop/` with a single entry point at `bin/fizzy-pop`. It uses Ruby's standard library plus the `httpx` HTTP client.
+
+### File Structure
+
+```
+bin/
+  fizzy-pop               # executable entry point (~40 lines)
+lib/
+  fizzy_pop.rb            # main require file (requires all sub-files)
+  fizzy_pop/
+    config.rb             # CLI parsing + YAML loading + merging
+    fizzy_client.rb       # Fizzy API client (identity, notifications, mark-read)
+    webhook_client.rb     # OpenClaw webhook delivery
+    agent.rb              # Agent: owns a FizzyClient, polls accounts
+    debug.rb              # Logging, breadcrumbs, color output
+```
+
+### Key Classes
+
+- **FizzyPop::Config** — Parses CLI args (`OptionParser`) and loads YAML config. Two modes: single-agent via `--token`, or multi-agent via `--config`. CLI flags override config file values.
+- **FizzyPop::FizzyClient** — HTTP client for the Fizzy API. Methods: `identity`, `notifications(slug)`, `mark_read(slug, id)`.
+- **FizzyPop::WebhookClient** — HTTP client for OpenClaw webhook delivery. Sends `POST /hooks/agent` with `agentId`, `message`, `mode`, `deliver` fields.
+- **FizzyPop::Agent** — Owns a `FizzyClient`, fetches identity/accounts on startup, polls for unread notifications. Contains the prompt template.
+- **FizzyPop::Debug** — Module with class-level state for verbose/dry_run flags, breadcrumb tracking, and color-coded HTTP request/response logging.
 
 ### Execution Flow
 
-1. **Parse CLI args** — `OptionParser` handles `--url`, `--token`, `--config`, `--webhook-url`, `--webhook-token`, `--polling`, `--dry-run`, `--verbose`
+1. **Parse CLI args** — `Config` handles `--url`, `--token`, `--config`, `--webhook-url`, `--webhook-token`, `--polling`, `--dry-run`, `--verbose`
 2. **Load config** — Two modes: single-agent via `--token` flag, or multi-agent via `--config` pointing to a YAML file. CLI flags override config file values.
-3. **Initialize agents** — Creates per-agent HTTPX clients with Bearer auth, fetches identity from `GET /my/identity`, extracts account slugs. Agents without valid accounts are removed.
+3. **Initialize agents** — Creates per-agent `FizzyClient` with Bearer auth, fetches identity from `GET /my/identity`, extracts account slugs. Agents without valid accounts are removed.
 4. **Polling loop** — Infinite loop (default 10s interval) that for each agent/account:
    - Fetches unread notifications (`GET /{slug}/notifications`)
    - Finds first notification with a creator (comments/mentions)

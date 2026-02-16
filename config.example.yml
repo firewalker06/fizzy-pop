@@ -1,7 +1,7 @@
 # fizzy-pop multi-agent configuration
 #
 # Copy this file to config.yml and fill in your values.
-# Run with: ruby app.rb --config config.yml
+# Run with: ruby bin/fizzy-pop --config config.yml
 
 # Fizzy base URL (required)
 url: https://app.fizzy.do
