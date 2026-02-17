@@ -1,9 +1,13 @@
 module FizzyPop
   class Config
-    attr_reader :url, :webhook_url, :webhook_token, :polling, :dry_run, :verbose, :agents
+    DEFAULT_INTERVAL_POLLING = 10
+    DEFAULT_INTERVAL_WEBHOOK = 3
+    DEFAULT_INTERVAL_AGENT_POLL = 0.5
+
+    attr_reader :url, :webhook_url, :webhook_token, :interval_polling, :interval_webhook, :interval_agent_poll, :dry_run, :verbose, :agents
 
     def initialize(argv)
-      options = { polling: 10, agents: [] }
+      options = { agents: [] }
 
       OptionParser.new do |opts|
         opts.banner = "Usage: fizzy-pop [--config FILE | --token TOKEN] [options]"
@@ -13,7 +17,6 @@ module FizzyPop
         opts.on("--config FILE", "YAML config file for multi-agent mode") { |v| options[:config] = v }
         opts.on("--webhook-url URL", "OpenClaw webhook base URL") { |v| options[:webhook_url] = v }
         opts.on("--webhook-token TOKEN", "OpenClaw webhook token") { |v| options[:webhook_token] = v }
-        opts.on("--polling SECONDS", Integer, "Polling interval in seconds (default: 10)") { |v| options[:polling] = v }
         opts.on("--dry-run", "Print webhook requests instead of sending them") { options[:dry_run] = true }
         opts.on("--verbose", "Print full request/response headers and body") { options[:verbose] = true }
       end.parse!(argv)
@@ -28,7 +31,16 @@ module FizzyPop
         options[:url] ||= config["url"]
         options[:webhook_url] ||= config["webhook_url"]
         options[:webhook_token] ||= config["webhook_token"]
-        options[:polling] = config["polling"] if config["polling"] && options[:polling] == 10
+
+        if config["polling"]
+          warn "\e[33m[warning]\e[0m 'polling' is deprecated. Use 'interval' instead. Defaulting to interval.polling: #{DEFAULT_INTERVAL_POLLING}s, interval.webhook: #{DEFAULT_INTERVAL_WEBHOOK}s, interval.agent_poll: #{DEFAULT_INTERVAL_AGENT_POLL}s"
+        end
+
+        if config["interval"].is_a?(Hash)
+          options[:interval_polling] = config["interval"]["polling"]
+          options[:interval_webhook] = config["interval"]["webhook"]
+          options[:interval_agent_poll] = config["interval"]["agent_poll"]
+        end
 
         if config["agents"]
           options[:agents] = config["agents"].map do |agent|
@@ -48,7 +60,9 @@ module FizzyPop
       @url = options[:url]
       @webhook_url = options[:webhook_url]
       @webhook_token = options[:webhook_token]
-      @polling = options[:polling]
+      @interval_polling = options[:interval_polling] || DEFAULT_INTERVAL_POLLING
+      @interval_webhook = options[:interval_webhook] || DEFAULT_INTERVAL_WEBHOOK
+      @interval_agent_poll = options[:interval_agent_poll] || DEFAULT_INTERVAL_AGENT_POLL
       @dry_run = options[:dry_run]
       @verbose = options[:verbose]
       @agents = options[:agents]
