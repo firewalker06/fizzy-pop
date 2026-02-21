@@ -26,7 +26,7 @@ module FizzyPop
       def debug_response(response, label)
         if response.is_a?(HTTPX::ErrorResponse)
           puts "\e[31m<-- #{label} error: #{response.error.message}\e[0m"
-          puts "\e[31m    #{response.body.inspect}\e[0m" if response.body
+          puts "\e[31m    #{response.body.inspect}\e[0m" if response.respond_to?(:body) && response.body
         else
           status = response.status.to_i
           color = (200..299).cover?(status) ? "\e[32m" : "\e[31m"
