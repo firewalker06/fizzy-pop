@@ -16,7 +16,8 @@ module FizzyPop
 
       if identity
         @accounts = identity["accounts"]
-        puts "\e[32m[#{@name}]\e[0m Found #{@accounts&.length || 0} account(s)"
+        @user_id = @accounts&.first&.dig("user", "id")
+        puts "\e[32m[#{@name}]\e[0m Found #{@accounts&.length || 0} account(s) (user: #{@user_id})"
       else
         puts "\e[31m[#{@name}]\e[0m Failed to fetch identity"
         @accounts = []
@@ -29,7 +30,11 @@ module FizzyPop
       @accounts && !@accounts.empty?
     end
 
-    def poll_notifications(queue)
+    def user_id
+      @user_id
+    end
+
+    def poll_notifications(queue, bot_user_ids: [])
       @accounts.each do |account|
         slug = account["slug"]
 
@@ -50,6 +55,19 @@ module FizzyPop
         end
 
         next if unread["creator"].nil?
+
+        # Skip notifications from other bot agents to avoid bot-to-bot noise,
+        # UNLESS the notification body explicitly @mentions this agent by name.
+        creator_id = unread["creator"]["id"]
+        if bot_user_ids.include?(creator_id)
+          body_text = unread["body"].to_s.downcase
+          agent_mentioned = body_text.include?("@#{@name.downcase}")
+          unless agent_mentioned
+            puts "\e[90m[#{@name}]\e[0m Skipping notification from bot agent #{unread["creator"]["name"]} (#{creator_id})"
+            next
+          end
+          puts "\e[33m[#{@name}]\e[0m Bot agent #{unread["creator"]["name"]} mentioned @#{@name} — delivering anyway."
+        end
 
         message = <<~PROMPT
                   You have a new notification in Fizzy that requires your attention.

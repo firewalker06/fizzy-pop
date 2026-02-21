@@ -24,6 +24,10 @@ if active_agents.empty?
   abort "No agents have valid accounts. Check your tokens."
 end
 
+# Collect all bot user IDs so agents can filter bot-to-bot notifications
+bot_user_ids = active_agents.map(&:user_id).compact
+puts "Bot user IDs for filtering: #{bot_user_ids.join(", ")}"
+
 puts "Polling #{active_agents.length} agent(s) every #{config.interval_polling}s, webhook delivery every #{config.interval_webhook}s... (Ctrl+C to stop)"
 
 Thread.abort_on_exception = true
@@ -32,7 +36,7 @@ queue = Queue.new
 begin
   poll_thread = Thread.new do
     loop do
-      active_agents.each { |agent| agent.poll_notifications(queue) }
+      active_agents.each { |agent| agent.poll_notifications(queue, bot_user_ids: bot_user_ids) }
       FizzyPop::Debug.reset_breadcrumbs
       sleep config.interval_polling
     end
