@@ -53,6 +53,13 @@ module FizzyPop
         end
       end
 
+      options[:url] ||= ENV["URL"]
+      options[:token] ||= ENV["TOKEN"]
+      options[:adapter] ||= ENV["ADAPTER"]
+      options[:webhook_url] ||= ENV["WEBHOOK_URL"]
+      options[:webhook_token] ||= ENV["WEBHOOK_TOKEN"]
+      options[:webhook_route] ||= ENV["WEBHOOK_ROUTE"]
+
       # Backward compatibility: single --token creates a "default" agent
       if options[:token] && options[:agents].empty?
         options[:agents] = [{ name: "default", token: options[:token] }]

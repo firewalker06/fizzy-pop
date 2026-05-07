@@ -81,7 +81,7 @@ lib/
 ### Configuration
 
 - **config.yml** (gitignored) — YAML with `url`, `adapter`, shared webhook settings, interval settings, and an `agents` array (each with `name` and `token`). See `config.example.yml` for the template.
-- **.env** (gitignored) — Used by `bin/kamal` for deployment variables (`HOSTS`, `URL`, `TOKEN`, `WEBHOOK_URL`, `WEBHOOK_TOKEN`).
+- **.env** (gitignored) — Used by `bin/kamal` for deployment variables (`HOSTS`, `URL`, `TOKEN`, `ADAPTER`, `WEBHOOK_URL`, `WEBHOOK_TOKEN`, `WEBHOOK_ROUTE`).
 
 ### Debugging
 

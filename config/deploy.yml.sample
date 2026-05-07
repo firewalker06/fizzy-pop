@@ -8,7 +8,7 @@ image: fizzy-pop
 servers:
   web:
     hosts: <%= ENV.fetch("HOSTS").split(",").map(&:strip) %>
-    cmd: --verbose --config /app/config.yml
+    cmd: --verbose --config /app/config.yml <%= "--webhook-route #{ENV["WEBHOOK_ROUTE"]}" if ENV["WEBHOOK_ROUTE"] %>
     proxy: false
     options:
       add-host: "host.docker.internal:host-gateway"

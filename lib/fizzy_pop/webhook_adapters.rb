@@ -41,7 +41,7 @@ module FizzyPop
       DEFAULT_ROUTE = "fizzy"
 
       def initialize(route: nil)
-        @route = route || DEFAULT_ROUTE
+        @route = normalize_route(route)
       end
 
       def url(base_url)
@@ -66,6 +66,15 @@ module FizzyPop
 
       def label
         "Hermes webhook"
+      end
+
+      private
+
+      def normalize_route(route)
+        value = route.to_s.strip
+        value = DEFAULT_ROUTE if value.empty?
+        value = value.sub(%r{\A/+}, "")
+        value.sub(%r{\Awebhooks/+}, "")
       end
     end
   end

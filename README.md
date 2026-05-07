@@ -193,8 +193,10 @@ Create a `.env` file in the project root:
 HOSTS=your-server-ip
 URL=https://app.fizzy.do
 TOKEN=your-fizzy-token
+ADAPTER=openclaw
 WEBHOOK_URL=http://host.docker.internal:18789
 WEBHOOK_TOKEN=your-webhook-token
+WEBHOOK_ROUTE=fizzy
 ```
 
 For multi-agent mode, mount your `config.yml` instead of using `TOKEN`.
