@@ -6,14 +6,18 @@
 # Fizzy base URL (required)
 url: https://app.fizzy.do
 
-# OpenClaw webhook settings (required unless --dry-run)
+# Webhook adapter: openclaw or hermes
+adapter: openclaw
+
+# Webhook settings (required unless --dry-run)
 webhook_url: http://localhost:18789
 webhook_token: your-webhook-token
+# webhook_route: fizzy  # optional; used by adapters that support named routes
 
 # Interval settings in seconds (optional)
 interval:
   polling: 10      # how often to check for notifications (default: 10)
-  webhook: 3       # delay between webhook deliveries (default: 5)
+  webhook: 3       # delay between webhook deliveries (default: 3)
   agent_poll: 0.5  # delay between each agent's poll (default: 0.5)
 
 # Agent configurations
@@ -28,12 +32,4 @@ agents:
   - name: prowl
     token: your-prowl-fizzy-token
 
-# The webhook payload will include the agent name:
-# {
-#   "agent": "optimus",
-#   "message": "...",
-#   "mode": "now",
-#   "deliver": false
-# }
-#
-# OpenClaw can use this to route to the correct agent session.
+# The selected adapter maps this universal config to the target webhook format.

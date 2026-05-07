@@ -2,7 +2,7 @@
 
 <div align="center"><img src="fizzypop_logo.png" alt="Fizzy Pop Logo"></div>
 
-A polling daemon that watches [Fizzy](https://app.fizzy.do) for unread notifications and forwards them to an [OpenClaw](https://docs.openclaw.ai) webhook.
+A polling daemon that watches [Fizzy](https://app.fizzy.do) for unread notifications and forwards them to an [OpenClaw](https://docs.openclaw.ai) or [Hermes Agent](https://hermes-agent.nousresearch.com) webhook.
 
 [OpenClaw's heartbeat is costly](https://docs.openclaw.ai/gateway/heartbeat#cost-awareness) for simple notification checking, which is why this separate polling service exists. We can also added more instructions and references in the webhook payload for better result.
 
@@ -19,6 +19,7 @@ A polling daemon that watches [Fizzy](https://app.fizzy.do) for unread notificat
   - [Run](#run)
 - [Kamal Deployment](#kamal-deployment)
 - [OpenClaw Webhook Setup](#openclaw-webhook-setup)
+- [Hermes Agent Webhook Setup](#hermes-agent-webhook-setup)
 - [How It Works](#how-it-works)
 
 ## Setup
@@ -30,7 +31,7 @@ bundle install
 ## Usage
 
 ```bash
-ruby app.rb [--config FILE | --token TOKEN] [options]
+ruby bin/fizzy-pop [--config FILE | --token TOKEN] [options]
 ```
 
 ### Single Agent Mode
@@ -38,7 +39,7 @@ ruby app.rb [--config FILE | --token TOKEN] [options]
 For a single agent, use the `--token` flag:
 
 ```bash
-ruby app.rb --url https://app.fizzy.do --token abc123 --webhook-url http://localhost:18789 --webhook-token secret
+ruby bin/fizzy-pop --url https://app.fizzy.do --token abc123 --webhook-url http://localhost:18789 --webhook-token secret
 ```
 
 ### Multi-Agent Mode
@@ -46,7 +47,7 @@ ruby app.rb --url https://app.fizzy.do --token abc123 --webhook-url http://local
 For multiple agents, use a YAML config file:
 
 ```bash
-ruby app.rb --config config.yml
+ruby bin/fizzy-pop --config config.yml
 ```
 
 Create a `config.yml` (see `config.example.yml`):
@@ -55,7 +56,12 @@ Create a `config.yml` (see `config.example.yml`):
 url: https://app.fizzy.do
 webhook_url: http://localhost:18789
 webhook_token: your-webhook-token
-polling: 10
+adapter: openclaw
+
+interval:
+  polling: 10
+  webhook: 3
+  agent_poll: 0.5
 
 agents:
   - name: optimus
@@ -66,16 +72,7 @@ agents:
     token: prowl-fizzy-token
 ```
 
-Each agent's notifications are polled independently. The webhook payload includes the agent name so OpenClaw can route to the correct session:
-
-```json
-{
-  "agent": "optimus",
-  "message": "You have a new notification...",
-  "mode": "now",
-  "deliver": false
-}
-```
+Each agent's notifications are polled independently. The selected adapter maps the universal webhook settings to the target webhook format.
 
 ### Options
 
@@ -84,8 +81,10 @@ Each agent's notifications are polled independently. The webhook payload include
 | `--url URL` | Yes* | Fizzy base URL (e.g. `https://app.fizzy.do`) | — |
 | `--token TOKEN` | Yes* | Fizzy personal access token (single agent mode) | — |
 | `--config FILE` | Yes* | YAML config file for multi-agent mode | — |
-| `--webhook-url URL` | No | OpenClaw webhook base URL | — |
-| `--webhook-token TOKEN` | No | OpenClaw webhook bearer token | — |
+| `--adapter ADAPTER` | No | Webhook adapter: `openclaw` or `hermes` | `openclaw` |
+| `--webhook-url URL` | No | Webhook base URL | — |
+| `--webhook-token TOKEN` | No | Webhook bearer token or HMAC secret | — |
+| `--webhook-route ROUTE` | No | Webhook route name for adapters that use routes | — |
 | `--polling SECONDS` | No | Polling interval in seconds | `10` |
 | `--dry-run` | No | Print webhook payload without sending | — |
 | `--verbose` | No | Print full request/response headers and body (redacts Authorization) | — |
@@ -99,13 +98,13 @@ Both `--webhook-url` and `--webhook-token` are required unless `--dry-run` is us
 Dry run (single agent, no webhook):
 
 ```bash
-ruby app.rb --url https://app.fizzy.do --token abc123 --dry-run
+ruby bin/fizzy-pop --url https://app.fizzy.do --token abc123 --dry-run
 ```
 
 Single agent with webhook forwarding:
 
 ```bash
-ruby app.rb \
+ruby bin/fizzy-pop \
   --url https://app.fizzy.do \
   --token abc123 \
   --webhook-url http://localhost:18789 \
@@ -115,19 +114,31 @@ ruby app.rb \
 Multi-agent with config file:
 
 ```bash
-ruby app.rb --config config.yml
+ruby bin/fizzy-pop --config config.yml
 ```
 
 Multi-agent dry run:
 
 ```bash
-ruby app.rb --config config.yml --dry-run --verbose
+ruby bin/fizzy-pop --config config.yml --dry-run --verbose
+```
+
+Hermes Agent delivery:
+
+```bash
+ruby bin/fizzy-pop \
+  --url https://app.fizzy.do \
+  --token abc123 \
+  --adapter hermes \
+  --webhook-url http://localhost:8644 \
+  --webhook-route fizzy \
+  --webhook-token my-route-secret
 ```
 
 Run as background daemon:
 
 ```bash
-nohup ruby app.rb --config config.yml > fizzy-pop.log 2>&1 &
+nohup ruby bin/fizzy-pop --config config.yml > fizzy-pop.log 2>&1 &
 ```
 
 ## Docker
@@ -238,11 +249,11 @@ Fizzy Pop posts to `POST /hooks/agent` with `Authorization: Bearer <token>`.
 
 ### Agent Routing (Multi-Agent Mode)
 
-When using multi-agent mode, the webhook payload includes an `agent` field:
+When using multi-agent mode, the OpenClaw adapter payload includes an `agentId` field:
 
 ```json
 {
-  "agent": "optimus",
+  "agentId": "optimus",
   "message": "...",
   "mode": "now",
   "deliver": false
@@ -251,11 +262,30 @@ When using multi-agent mode, the webhook payload includes an `agent` field:
 
 Configure OpenClaw to route based on the agent name. See the [OpenClaw webhook docs](https://docs.openclaw.ai/automation/webhook) for more details.
 
+## Hermes Agent Webhook Setup
+
+Enable the Hermes webhook adapter and create a route that accepts Fizzy Pop payloads:
+
+```yaml
+platforms:
+  webhook:
+    enabled: true
+    extra:
+      port: 8644
+      routes:
+        fizzy:
+          secret: "my-route-secret"
+          prompt: "{message}"
+          deliver: "log"
+```
+
+Run Fizzy Pop with `adapter: hermes`, `webhook_url`, `webhook_route`, and `webhook_token`. The Hermes adapter posts to `POST /webhooks/<route>` and signs the JSON body with the generic Hermes `X-Webhook-Signature` HMAC-SHA256 header. It also sends `X-Request-ID` so Hermes can de-duplicate retries.
+
 ## How It Works
 
 1. Authenticates with Fizzy using personal access token(s)
 2. Polls for unread notifications every N seconds (for each agent in multi-agent mode)
 3. For each unread notification with a creator (comments/mentions):
    - Marks it as read in Fizzy
-   - Forwards the notification to the OpenClaw webhook (`POST /hooks/agent`)
+   - Forwards the notification through the configured webhook adapter
    - Includes agent identifier in payload (multi-agent mode)

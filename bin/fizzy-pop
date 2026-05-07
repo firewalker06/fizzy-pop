@@ -10,7 +10,8 @@ FizzyPop::Debug.verbose = config.verbose
 FizzyPop::Debug.dry_run = config.dry_run
 
 webhook_client = if config.webhook_url && config.webhook_token
-  FizzyPop::WebhookClient.new(config.webhook_url, config.webhook_token)
+  adapter = FizzyPop::WebhookAdapters.build(config.adapter, route: config.webhook_route)
+  FizzyPop::WebhookClient.new(config.webhook_url, config.webhook_token, adapter: adapter)
 end
 
 agents = config.agents.map do |agent_config|
@@ -46,7 +47,7 @@ begin
       if webhook_client
         webhook_client.deliver(item[:agent_name], item[:message])
       elsif !FizzyPop::Debug.dry_run
-        abort "Missing required --webhook-url and --webhook-token"
+        abort "Missing required webhook settings for #{config.adapter}"
       end
 
       sleep config.interval_webhook

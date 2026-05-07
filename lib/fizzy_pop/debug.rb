@@ -15,7 +15,10 @@ module FizzyPop
       def debug_request(method, url, headers: {}, body: nil)
         puts "\e[36m--> #{method.upcase} #{url}\e[0m"
         if @verbose
-          headers.each { |k, v| puts "\e[36m    #{k}: #{k.downcase == "authorization" ? "[REDACTED]" : v}\e[0m" }
+          headers.each do |k, v|
+            redacted = ["authorization", "x-webhook-signature"].include?(k.downcase) ? "[REDACTED]" : v
+            puts "\e[36m    #{k}: #{redacted}\e[0m"
+          end
           if body
             puts "\e[36m    Body:\e[0m"
             puts "\e[31m      #{body}\e[0m"

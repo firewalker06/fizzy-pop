@@ -1,24 +1,16 @@
 module FizzyPop
   class WebhookClient
-    def initialize(base_url, token)
+    def initialize(base_url, token, adapter:)
       @base_url = base_url
       @token = token
-      @headers = {
-        "authorization" => "Bearer #{token}",
-        "content-type" => "application/json"
-      }
-      @http = HTTPX.with(headers: @headers)
+      @adapter = adapter
+      @http = HTTPX
     end
 
-    # Docs: https://docs.openclaw.ai/automation/webhook#post-/hooks/agent
     def deliver(agent_name, message)
-      webhook_url = "#{@base_url}/hooks/agent"
-      payload = JSON.generate(
-        agentId: agent_name,
-        message: message,
-        mode: "now",
-        deliver: false
-      )
+      webhook_url = @adapter.url(@base_url)
+      payload = @adapter.payload(agent_name, message)
+      headers = @adapter.headers(@token, payload)
 
       if Debug.dry_run
         puts "\n--dry-run: would POST to #{webhook_url}"
@@ -26,8 +18,8 @@ module FizzyPop
         return
       end
 
-      Debug.debug_request("POST", webhook_url, headers: @headers, body: payload)
-      if Debug.handle_response(@http.post(webhook_url, body: payload), "Webhook")
+      Debug.debug_request("POST", webhook_url, headers: headers, body: payload)
+      if Debug.handle_response(@http.post(webhook_url, headers: headers, body: payload), @adapter.label)
         puts "\e[32m[#{agent_name}]\e[0m Webhook delivered successfully."
       end
     end
