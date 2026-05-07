@@ -15,7 +15,10 @@ module FizzyPop
       def debug_request(method, url, headers: {}, body: nil)
         puts "\e[36m--> #{method.upcase} #{url}\e[0m"
         if @verbose
-          headers.each { |k, v| puts "\e[36m    #{k}: #{k.downcase == "authorization" ? "[REDACTED]" : v}\e[0m" }
+          headers.each do |k, v|
+            redacted = ["authorization", "x-webhook-signature"].include?(k.downcase) ? "[REDACTED]" : v
+            puts "\e[36m    #{k}: #{redacted}\e[0m"
+          end
           if body
             puts "\e[36m    Body:\e[0m"
             puts "\e[31m      #{body}\e[0m"
@@ -31,13 +34,12 @@ module FizzyPop
           status = response.status.to_i
           color = (200..299).cover?(status) ? "\e[32m" : "\e[31m"
           puts "#{color}<-- #{label} #{status} (#{response.body.to_s.bytesize} bytes)\e[0m"
+          body = response.body.to_s
           if @verbose
             response.headers.each { |k, v| puts "#{color}    #{k}: #{v}\e[0m" }
-            body = response.body.to_s
-            unless body.empty?
-              puts "#{color}    Body:\e[0m"
-              puts "#{color}#{JSON.pretty_generate(JSON.parse(body.to_s)).gsub(/^/, " " * 6)}\e[0m"
-            end
+          end
+          if @verbose || !(200..299).cover?(status)
+            debug_body(color, body)
           end
         end
       end
@@ -51,6 +53,19 @@ module FizzyPop
         else
           nil
         end
+      end
+
+      def debug_body(color, body)
+        return if body.empty?
+
+        formatted = begin
+          JSON.pretty_generate(JSON.parse(body))
+        rescue JSON::ParserError
+          body
+        end
+
+        puts "#{color}    Body:\e[0m"
+        puts "#{color}#{formatted.gsub(/^/, " " * 6)}\e[0m"
       end
     end
   end

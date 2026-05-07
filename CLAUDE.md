@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Fizzy Pop is a Ruby polling daemon that watches [Fizzy](https://app.fizzy.do) for unread notifications and forwards them to an [OpenClaw](https://docs.openclaw.ai) webhook. It replaces OpenClaw's built-in heartbeat mechanism with a more efficient dedicated polling service.
+Fizzy Pop is a Ruby polling daemon that watches [Fizzy](https://app.fizzy.do) for unread notifications and forwards them to an [OpenClaw](https://docs.openclaw.ai) or Hermes Agent webhook. It replaces built-in heartbeat mechanisms with a more efficient dedicated polling service.
 
 ## Commands
 
@@ -17,6 +17,7 @@ ruby bin/fizzy-pop --config config.yml
 
 # Run single agent
 ruby bin/fizzy-pop --url https://app.fizzy.do --token TOKEN --webhook-url URL --webhook-token TOKEN
+ruby bin/fizzy-pop --url https://app.fizzy.do --token TOKEN --adapter hermes --webhook-url URL --webhook-token SECRET
 
 # Dry run (validates payloads without sending webhooks)
 ruby bin/fizzy-pop --config config.yml --dry-run
@@ -50,7 +51,8 @@ lib/
   fizzy_pop/
     config.rb             # CLI parsing + YAML loading + merging
     fizzy_client.rb       # Fizzy API client (identity, notifications, mark-read)
-    webhook_client.rb     # OpenClaw webhook delivery
+    webhook_adapters.rb   # OpenClaw and Hermes payload/header adapters
+    webhook_client.rb     # Generic webhook delivery
     agent.rb              # Agent: owns a FizzyClient, polls accounts
     debug.rb              # Logging, breadcrumbs, color output
 ```
@@ -59,13 +61,14 @@ lib/
 
 - **FizzyPop::Config** — Parses CLI args (`OptionParser`) and loads YAML config. Two modes: single-agent via `--token`, or multi-agent via `--config`. CLI flags override config file values.
 - **FizzyPop::FizzyClient** — HTTP client for the Fizzy API. Methods: `identity`, `notifications(slug)`, `mark_read(slug, id)`.
-- **FizzyPop::WebhookClient** — HTTP client for OpenClaw webhook delivery. Sends `POST /hooks/agent` with `agentId`, `message`, `mode`, `deliver` fields.
+- **FizzyPop::WebhookAdapters** — Maps universal webhook config to target-specific URL paths, payloads, and headers.
+- **FizzyPop::WebhookClient** — Generic HTTP client for webhook delivery using the selected adapter.
 - **FizzyPop::Agent** — Owns a `FizzyClient`, fetches identity/accounts on startup, polls for unread notifications. Contains the prompt template.
 - **FizzyPop::Debug** — Module with class-level state for verbose/dry_run flags, breadcrumb tracking, and color-coded HTTP request/response logging.
 
 ### Execution Flow
 
-1. **Parse CLI args** — `Config` handles `--url`, `--token`, `--config`, `--webhook-url`, `--webhook-token`, `--polling`, `--dry-run`, `--verbose`
+1. **Parse CLI args** — `Config` handles `--url`, `--token`, `--config`, `--adapter`, `--webhook-url`, `--webhook-token`, `--webhook-route`, `--dry-run`, `--verbose`
 2. **Load config** — Two modes: single-agent via `--token` flag, or multi-agent via `--config` pointing to a YAML file. CLI flags override config file values.
 3. **Initialize agents** — Creates per-agent `FizzyClient` with Bearer auth, fetches identity from `GET /my/identity`, extracts account slugs. Agents without valid accounts are removed.
 4. **Polling loop** — Infinite loop (default 10s interval) that for each agent/account:
@@ -73,12 +76,12 @@ lib/
    - Finds first notification with a creator (comments/mentions)
    - Marks it as read (`POST /{slug}/notifications/{id}/reading`)
    - Builds a prompt message with Fizzy command references
-   - Sends to OpenClaw webhook (`POST /hooks/agent`) with `agentId`, `message`, `mode`, `deliver` fields
+   - Sends through the configured webhook adapter: OpenClaw (`POST /hooks/agent`) or Hermes (`POST /webhooks/<route>`)
 
 ### Configuration
 
-- **config.yml** (gitignored) — YAML with `url`, `webhook_url`, `webhook_token`, `polling`, and an `agents` array (each with `name` and `token`). See `config.example.yml` for the template.
-- **.env** (gitignored) — Used by `bin/kamal` for deployment variables (`HOSTS`, `URL`, `TOKEN`, `WEBHOOK_URL`, `WEBHOOK_TOKEN`).
+- **config.yml** (gitignored) — YAML with `url`, `adapter`, shared webhook settings, interval settings, and an `agents` array (each with `name` and `token`). See `config.example.yml` for the template.
+- **.env** (gitignored) — Used by `bin/kamal` for deployment variables (`HOSTS`, `URL`, `TOKEN`, `ADAPTER`, `WEBHOOK_URL`, `WEBHOOK_TOKEN`, `WEBHOOK_ROUTE`).
 
 ### Debugging
 
