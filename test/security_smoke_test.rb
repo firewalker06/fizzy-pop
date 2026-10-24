@@ -56,7 +56,7 @@ writer = Zlib::GzipWriter.new(compressed)
 writer.write(message)
 writer.close
 reader = Zlib::GzipReader.new(StringIO.new(compressed.string))
-check(reader.read == message.b, "Gzip round trip failed")
+check(reader.read.b == message.b, "Gzip round trip failed")
 reader.close
 
 config = FizzyPop::Config.new(["--url", "http://example.invalid", "--token", "test-only", "--dry-run"])
