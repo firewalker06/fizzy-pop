@@ -2,6 +2,7 @@
 
 $stdout.sync = true
 
+require "bundler/setup"
 require_relative "../lib/fizzy_pop"
 
 config = FizzyPop::Config.new(ARGV)

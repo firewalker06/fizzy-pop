@@ -24,9 +24,21 @@ A polling daemon that watches [Fizzy](https://app.fizzy.do) for unread notificat
 
 ## Setup
 
+Use Ruby 3.4.12 (see `.ruby-version`).
+
 ```bash
 bundle install
 ```
+
+Run the security and application smoke checks without service credentials:
+
+```bash
+bundle exec ruby test/security_smoke_test.rb
+```
+
+The checks verify the selected Ruby, JSON and default zlib versions, the locked
+development dependencies, webhook JSON payloads, Hermes signing, gzip and CLI
+configuration. They do not send network requests.
 
 ## Usage
 
@@ -147,6 +159,17 @@ nohup ruby bin/fizzy-pop --config config.yml > fizzy-pop.log 2>&1 &
 
 ```bash
 docker build -t fizzy-pop .
+```
+
+The build and runtime stages use the same pinned Ruby 3.4.12 Alpine 3.23 image.
+It includes default zlib 3.2.3. JSON is an explicit runtime dependency. Kamal and
+its development dependencies are excluded from the service image.
+
+Verify the built image without mounting service credentials:
+
+```bash
+docker run --rm --entrypoint bundle \
+  -v "$PWD/test:/app/test:ro" fizzy-pop exec ruby test/security_smoke_test.rb
 ```
 
 ### Run

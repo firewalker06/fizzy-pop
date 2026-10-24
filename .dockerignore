@@ -1,6 +1,10 @@
 # Ignore version control and editor files
 .git
 .ruby-lsp
+# Keep local credentials out of the build context.
+.env
+config.yml
+config/deploy.yml
 # Ignore deployment and build files
 bin/kamal
 build.log
